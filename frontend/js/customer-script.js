@@ -1,6 +1,5 @@
 // 🌟 เปลี่ยน API ให้ชี้ไปที่หลังบ้านบน Render (อย่าลืมเปลี่ยนชื่อ banana-backend ให้ตรงกับของคุณวงศกรนะครับ)
-const API_URL = 'https://banana-backend.onrender.com/api';
-
+const API_URL = 'https://banana-backend-fbt6.onrender.com/api';
 const PROMPTPAY_ID = "0968585135"; 
 const TRUE_WALLET_NUMBER = "0968585135";
 
