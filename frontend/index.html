@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <link rel="icon" href="data:,">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบจัดการร้าน</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+
+<div id="toastContainer"></div>
+
+<div id="loginScreen">
+  <div style="font-size: 60px; margin-bottom: 10px;">🍌</div>
+  <h2 style="color: var(--primary); font-family: 'Prompt';">ระบบจัดการร้าน</h2>
+  <input type="password" id="pinInput" class="pin-input" placeholder="รหัส PIN" maxlength="4" />
+  <button class="btn btn-primary" style="max-width: 300px;" onclick="handleLogin()">เข้าใช้งาน</button>
+</div>
+
+<div id="mainApp" style="display:none;">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">🍌 ร้านของเรา</div>
+      <div style="display:flex; flex-direction:column; gap: 6px; align-items:flex-end;">
+        <button id="btnStoreStatus" class="store-status-btn" onclick="toggleStoreStatus()">🟢 เปิดรับออเดอร์</button>
+        <div class="user-badge" onclick="logout()">👤 <span id="userName"></span> (ออกระบบ)</div>
+      </div>
+    </div>
+    <div class="nav">
+      <button class="nav-btn active" id="nav-dashboard" onclick="switchPage('dashboard',this)">📊 ภาพรวม</button>
+      <button class="nav-btn" id="nav-finance" onclick="switchPage('finance',this)">💰 การเงิน</button>
+      <button class="nav-btn" id="nav-orders" onclick="switchPage('orders',this)">📋 ออเดอร์</button>
+      <button class="nav-btn" id="nav-consignment" onclick="switchPage('consignment',this)">📦 ฝากขาย</button>
+      <button class="nav-btn" id="nav-event" onclick="switchPage('event', this)">🎁 จัดเลี้ยง</button>
+      <button class="nav-btn" id="nav-products" onclick="switchPage('products',this)">🧺 สินค้า</button>
+      <button class="nav-btn" id="nav-reports" onclick="switchPage('reports',this)">📑 รายงาน</button>
+    </div>
+  </div>
+
+  <div class="page active" id="page-dashboard">
+    <div id="dashAlertPending" style="display:none; background: linear-gradient(135deg, #FFCF60, #E8600A); color: white; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; justify-content: space-between; align-items: center; cursor: pointer; box-shadow: 0 4px 15px rgba(232, 96, 10, 0.3);" onclick="switchPage('orders', document.getElementById('nav-orders')); setOrderFilter('pending', document.querySelector('.tab-pending'))">
+      <div style="font-weight: bold; font-size: 16px; font-family: 'Prompt';">🚨 มีออเดอร์ใหม่ รอยืนยันสลิป/รับออเดอร์!</div>
+      <div style="background: white; color: var(--danger); padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px;" id="dashPendingCount">0 คิว</div>
+    </div>
+
+    <div class="card" style="border: 2px solid var(--primary);">
+      <div class="card-title">📅 สรุปยอดของ "วันนี้"</div>
+      <div class="grid-3">
+        <div class="stat-box" style="background:#E8F5EE; border: 1px solid #A8DDB8;">
+          <div style="font-size:14px; color:#2E7D4F; font-weight:bold;">💚 รับเข้าวันนี้</div>
+          <div style="font-size:28px; font-weight:bold; font-family:'Prompt'; color:var(--success);" id="dashIncToday">฿0</div>
+        </div>
+        <div class="stat-box" style="background:#FFF0F0; border: 1px solid #FFBBBB;">
+          <div style="font-size:14px; color:#C0392B; font-weight:bold;">❤️ จ่ายออกวันนี้</div>
+          <div style="font-size:28px; font-weight:bold; font-family:'Prompt'; color:var(--danger);" id="dashExpToday">฿0</div>
+        </div>
+        <div class="stat-box" style="background:#FFF8E8; border: 1px solid #FFCF60; box-shadow: 0 4px 10px rgba(245, 200, 66, 0.2);">
+          <div style="font-size:14px; color:#B8860B; font-weight:bold;">💰 กำไรวันนี้</div>
+          <div style="font-size:28px; font-weight:bold; font-family:'Prompt'; color:var(--primary-dark);" id="dashProfitToday">฿0</div>
+        </div>
+      </div>
+      <div style="text-align: right; margin-top: 10px; font-size: 12px; color: var(--text3);">
+        ยอดสะสมรวมตั้งแต่เปิดร้าน: รับ <span id="sumInc" style="font-weight:bold; color:var(--primary);">฿0</span> | จ่าย <span id="sumExp" style="font-weight:bold; color:var(--danger);">฿0</span> | กำไร <span id="sumProfit" style="font-weight:bold; color:var(--success);">฿0</span>
+      </div>
+    </div>
+
+    <div class="card" style="border: 1.5px solid var(--border);">
+      <div class="card-title" style="color: var(--text);">📋 ออเดอร์เฉพาะวันนี้ (5 รายการล่าสุด)</div>
+      <div id="dashTodayOrdersList" style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="text-align:center; color:var(--text3); padding: 20px;">กำลังโหลดข้อมูล...</div>
+      </div>
+    </div>
+
+    <div class="card" style="border: 2px solid #D4AF37;">
+      <div class="card-title">📅 สรุปยอด 1 เดือนย้อนหลัง (30 วัน)</div>
+      <div class="grid-3">
+        <div class="stat-box" style="background:#E8F5EE; border: 1px solid #A8DDB8;">
+          <div style="font-size:14px; color:#2E7D4F; font-weight:bold;">💚 รับเข้า (30 วัน)</div>
+          <div style="font-size:24px; font-weight:bold; font-family:'Prompt'; color:var(--success);" id="dashIncMonth">฿0</div>
+        </div>
+        <div class="stat-box" style="background:#FFF0F0; border: 1px solid #FFBBBB;">
+          <div style="font-size:14px; color:#C0392B; font-weight:bold;">❤️ จ่ายออก (30 วัน)</div>
+          <div style="font-size:24px; font-weight:bold; font-family:'Prompt'; color:var(--danger);" id="dashExpMonth">฿0</div>
+        </div>
+        <div class="stat-box" style="background:#FFF8E8; border: 1px solid #FFCF60; box-shadow: 0 4px 10px rgba(245, 200, 66, 0.2);">
+          <div style="font-size:14px; color:#B8860B; font-weight:bold;">💰 กำไร (30 วัน)</div>
+          <div style="font-size:24px; font-weight:bold; font-family:'Prompt'; color:var(--primary-dark);" id="dashProfitMonth">฿0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">📈 ยอดขาย 7 วันย้อนหลัง</div>
+        <div style="height: 200px; width: 100%;">
+          <canvas id="salesChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🏆 3 อันดับ เมนูขายดี (เงิน)</div>
+        <div id="topSellersList" style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="text-align:center; color:var(--text3); padding: 20px;">กำลังวิเคราะห์ข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚡ ทำงานด่วน</div>
+      <div class="grid-2">
+        
+        <button class="btn btn-primary" onclick="switchPage('orders', document.getElementById('nav-orders'))">🛒 + รับออเดอร์ใหม่</button>
+        <button class="btn btn-outline" onclick="switchPage('finance', document.getElementById('nav-finance')); setFinanceType('expense')">💸 - บันทึกรายจ่าย</button>
+        <button id="btnTrash" class="btn btn-outline" style="display:none; grid-column: span 2;" onclick="openTrashModal()">🗑️ ถังขยะ (กู้คืนข้อมูล)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-finance">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">บันทึกรายรับ-รายจ่าย</div>
+        <div class="tab-row" style="margin-bottom: 20px;">
+          <button class="tab-btn active" id="btnExp" onclick="setFinanceType('expense')" style="background:var(--danger); border-color:var(--danger); color:#fff;">🔴 รายจ่าย</button>
+          <button class="tab-btn" id="btnInc" onclick="setFinanceType('income')" style="color:var(--text2); border-color:var(--border);">🟢 รายรับ (อื่นๆ)</button>
+        </div>
+        
+        <div style="font-size:12px; color:var(--text3); margin-bottom:15px; display:none;" id="finHelperText">* รายรับจากการขายสินค้า จะถูกบันทึกอัตโนมัติจากหน้าออเดอร์แล้ว (ไม่ต้องมาพิมพ์ซ้ำ)</div>
+        
+        <div style="margin-bottom:15px;">
+          <div style="font-weight:bold; color:var(--text2); margin-bottom:5px; font-size:14px;">💰 จำนวนเงิน (บาท):</div>
+          <input class="form-control" type="number" id="finAmount" placeholder="0" style="font-size:24px; font-weight:bold; height:60px; color:var(--primary); text-align:center;" />
+        </div>
+
+        <div style="margin-bottom:15px;">
+          <div style="font-weight:bold; color:var(--text2); margin-bottom:8px; font-size:14px;">🏷️ รายละเอียด (จิ้มเลือก หรือพิมพ์เอง):</div>
+          
+          <div id="quickExpenseTags" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <button class="btn-outline" style="padding: 6px 12px; font-size: 13px; width: auto;" onclick="setFinNote('🛢️ ค่าแก๊ส')">🛢️ แก๊ส</button>
+            <button class="btn-outline" style="padding: 6px 12px; font-size: 13px; width: auto;" onclick="setFinNote('🍌 วัตถุดิบ (กล้วย/มัน)')">🍌 วัตถุดิบ</button>
+            <button class="btn-outline" style="padding: 6px 12px; font-size: 13px; width: auto;" onclick="setFinNote('🌾 เครื่องปรุง (แป้ง/น้ำตาล/น้ำมัน)')">🌾 แป้ง/น้ำมัน</button>
+            <button class="btn-outline" style="padding: 6px 12px; font-size: 13px; width: auto;" onclick="setFinNote('🛍️ ถุง/แพ็กเกจ')">🛍️ ถุง/กล่อง</button>
+            <button class="btn-outline" style="padding: 6px 12px; font-size: 13px; width: auto;" onclick="setFinNote('🛵 ค่าเดินทาง')">🛵 ค่าเดินทาง</button>
+          </div>
+          
+          <input class="form-control" id="finNote" placeholder="หรือ พิมพ์รายละเอียดเองตรงนี้..." />
+        </div>
+        
+        <div class="summary-box" style="margin-bottom:20px;">
+          <div style="font-size:14px; font-weight:bold; color:var(--text2);">📎 รูปบิล/สลิป (ถ้ามี - ไม่บังคับ)</div>
+          <div style="font-size:12px; color:var(--text3); margin-bottom:10px;">* หากจ่ายเงินสดตลาดนัด ไม่มีบิล สามารถข้ามการถ่ายรูปไปได้เลยครับ</div>
+          <input type="file" id="finSlipInput" accept="image/*" style="display: none;" onchange="previewFile(event, 'finSlipPreview', 'finBase64')" />
+          
+          <label for="finSlipInput" class="upload-zone" id="finUploadZone" style="padding:15px;">
+            <div id="finUploadPlaceholder">
+              <div class="upload-icon" style="font-size:24px;">📸</div>
+              <div class="upload-text" style="font-size:14px;">แตะเพื่อถ่ายรูปบิลกระดาษ / สลิปโอนเงิน</div>
+            </div>
+            <img id="finSlipPreview" style="display:none; width:100%; border-radius:8px; object-fit: contain; max-height: 200px;" />
+          </label>
+          <button type="button" id="btnChangeFinSlip" class="btn-outline" style="display:none; width: 100%; margin-top: 10px; padding: 8px; justify-content: center; align-items: center; gap: 5px;" onclick="document.getElementById('finSlipInput').click()">
+            🔄 เปลี่ยนรูป
+          </button>
+        </div>
+
+        <button class="btn btn-primary" onclick="saveFinance()" style="padding: 15px; font-size: 16px; width: 100%;">💾 บันทึกรายการ</button>
+      </div>
+      
+      <div class="card">
+        <div class="card-title">ประวัติการเงินรวม</div>
+        <div class="order-tabs-container">
+          <button class="order-tab fin-tab active" onclick="setFinanceHistoryFilter('all', this)">📂 ทั้งหมด</button>
+          <button class="order-tab fin-tab" onclick="setFinanceHistoryFilter('income', this)">🟢 รายรับ</button>
+          <button class="order-tab fin-tab" onclick="setFinanceHistoryFilter('expense', this)">🔴 รายจ่าย</button>
+        </div>
+        <input type="text" id="searchFinanceInput" class="form-control" placeholder="🔍 ค้นหา: เช่น ค่าแก๊ส, กล้วยทอด, ยอดเงิน..." style="margin-bottom: 10px; border-color: var(--primary);" oninput="filterFinance()" />
+        
+        <div id="financeFilterSummary" style="font-size: 14px; font-weight: bold; margin-bottom: 15px; text-align: right; background: var(--surface2); padding: 8px; border-radius: 8px;">
+            <span style="color:var(--success)">รายรับ: ฿0</span> | 
+            <span style="color:var(--danger)">รายจ่าย: ฿0</span> | 
+            <span style="color:var(--primary-dark)">สุทธิ: ฿0</span>
+        </div>
+
+        <div id="financeList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-orders">
+    <div class="grid-2">
+      <div class="card" style="background: #FAFAFA;">
+        <div class="card-title">⚡ รับออเดอร์หน้าแผง (ด่วน)</div>
+
+        <div style="display:flex; gap:10px; margin-bottom:5px;">
+  <input class="form-control" type="date" id="ordDate" style="flex:1; font-family:'Prompt'; font-weight:bold; color:var(--primary);" />
+  <input class="form-control" id="ordName" value="ลูกค้าหน้าร้าน" placeholder="ชื่อลูกค้า / จุดสังเกต" style="flex:2; font-weight:bold; transition: 0.3s;" />
+</div>
+<div style="margin-bottom:15px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:bold; padding: 8px; background: #E5F0FF; border-radius: 8px; border: 1px dashed #B8D4FF;">
+   <input type="checkbox" id="isOnlineOrderCheckbox" style="width:16px; height:16px; cursor:pointer;" onchange="toggleOnlineMode(this.checked)">
+   <label for="isOnlineOrderCheckbox" style="cursor:pointer; color:#0056b3; flex:1;">📱 รับออเดอร์ออนไลน์แทนลูกค้า (เข้าคิว "กำลังทำ" ทันที)</label>
+</div>
+
+        <div style="font-size:14px; font-weight:bold; color:var(--text2); margin-bottom:10px;">จิ้มเลือกราคาที่สั่ง (กดบวกเพิ่มได้เลย):</div>
+        
+        <div id="orderProductSelection" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px;"></div>
+
+        <div class="summary-box" style="border: 2px solid var(--primary); background: #FFFdfa;">
+          <div style="font-weight:bold; font-size:15px; color:var(--primary); border-bottom: 1px dashed var(--border); padding-bottom:8px; margin-bottom:8px;">🛒 สรุปรายการสั่งซื้อ:</div>
+          
+          <div id="quickOrderSummaryList" style="margin-bottom:15px; min-height: 40px;">
+            <div style="color:var(--text3); font-size:13px; text-align:center; padding-top:10px;">จิ้มปุ่มด้านบนเพื่อเพิ่มรายการ</div>
+          </div>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-top: 2px solid var(--border); padding-top: 10px;">
+            <div style="font-weight:bold; font-size:16px;">รวมต้องจ่ายทั้งหมด:</div>
+            <input class="form-control" type="number" id="ordTotal" disabled placeholder="0" style="width:120px; font-size:22px; font-weight:bold; background:transparent; color:var(--danger); text-align:right; border:none; padding:0;" />
+          </div>
+
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-primary" style="flex:2; background: var(--success); font-size:15px; padding:15px; box-shadow: 0 4px 10px rgba(76, 175, 125, 0.3);" onclick="saveQuickCashOrder()">💵 รับเงินสด (พอดี) & บันทึก</button>
+            <button class="btn btn-outline" style="flex:1; font-size:13px; padding:15px;" onclick="document.getElementById('advancedPayment').style.display = document.getElementById('advancedPayment').style.display === 'none' ? 'block' : 'none'">โอน / ทอน 🔽</button>
+          </div>
+        </div>
+
+        <div id="advancedPayment" class="summary-box" style="display:none; background: #fff; margin-top: 10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="font-weight:bold; color:var(--success); font-size:14px;">ยอดเงินที่ลูกค้าให้มา:</div>
+            <input class="form-control" type="number" id="ordPaidAmount" placeholder="0" style="width:120px; font-size:18px; font-weight:bold; border-color:var(--success); color:var(--success); text-align:right;" oninput="checkPaymentStatus()" />
+          </div>
+          <div id="paymentStatusText" style="text-align:right; font-size:14px; font-weight:bold; font-family:'Prompt'; margin-top:5px; margin-bottom:15px;"></div>
+          
+          <div style="font-size:13px; font-weight:bold; color:var(--text2); margin-bottom:5px;">📎 แนบสลิป (ถ้าลูกค้าโอน):</div>
+          <input type="file" id="ordSlipInput" accept="image/*" style="display: none;" onchange="previewFile(event, 'ordSlipPreview', 'ordBase64')" />
+          <label for="ordSlipInput" class="upload-zone" id="ordUploadZone" style="padding:15px;">
+            <div id="ordUploadPlaceholder"><div class="upload-icon" style="font-size:24px;">📸</div><div class="upload-text" style="font-size:13px;">แนบสลิป</div></div>
+            <img id="ordSlipPreview" style="display:none; width:100%; border-radius:8px; object-fit: contain; max-height: 150px;" />
+          </label>
+          <div id="aiStatusText" style="font-size:12px; color:var(--text3); text-align:center; margin-top:5px;">*แนบสลิปดึงยอดอัตโนมัติ</div>
+          <button type="button" id="btnChangeOrdSlip" class="btn-outline" style="display:none; width: 100%; margin-top: 5px; padding: 5px;" onclick="document.getElementById('ordSlipInput').click()">🔄 เปลี่ยนรูป</button>
+          
+          <button class="btn btn-primary" onclick="saveOrder()" style="margin-top: 15px; width: 100%; padding: 15px; font-size: 16px;">บันทึกออเดอร์ (โอน/ทอนเงิน)</button>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-title">ประวัติออเดอร์ย้อนหลัง</div>
+        
+        <div class="tab-row" style="margin-bottom: 15px;">
+          <button class="tab-btn active" id="tabOrderTypeAll" onclick="setOrderTypeFilter('all')">📂 ทุกประเภท</button>
+          <button class="tab-btn" id="tabOrderTypeNormal" onclick="setOrderTypeFilter('normal')">🏪 หน้าร้าน / ออนไลน์</button>
+          <button class="tab-btn" id="tabOrderTypeEvent" onclick="setOrderTypeFilter('event')" style="display: none; color: #B8860B; border-color: #D4AF37;">🎁 งานจัดเลี้ยง</button>
+        </div>
+
+        <div class="order-tabs-container">
+          <button class="order-tab tab-all active" onclick="setOrderFilter('all', this)">📂 ทั้งหมด</button>
+          <button class="order-tab tab-today" onclick="setOrderFilter('today', this)">📅 วันนี้</button>
+          <button class="order-tab tab-pending" onclick="setOrderFilter('pending', this)">🟡 รอยืนยัน</button>
+          <button class="order-tab tab-cooking" onclick="setOrderFilter('cooking', this)">🍳 กำลังทำ</button>
+          <button class="order-tab tab-completed" onclick="setOrderFilter('completed', this)">✅ เสร็จแล้ว</button>
+          <button class="order-tab tab-cancelled" onclick="setOrderFilter('cancelled', this)">❌ ยกเลิก</button>
+        </div>
+
+        <input type="text" id="searchOrderInput" class="form-control" placeholder="🔍 ค้นหา: เลขออเดอร์, ชื่อ, เบอร์โทร, พร้อมเพย์..." style="margin-bottom: 15px; border-color: var(--primary);" oninput="filterOrders()" />
+        
+        <div id="orderList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-consignment">
+    <div class="grid-2">
+      <div class="card" style="background: #FAFAFA; border: 2px solid var(--consignment);">
+        <div class="card-title" style="color: var(--consignment);">📦 ส่งของฝากขายร้านค้า (จำนวนถุง)</div>
+        
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+          <input class="form-control" type="date" id="csnDate" style="flex:1; font-family:'Prompt'; font-weight:bold; color:var(--consignment);" />
+          <input class="form-control" id="csnName" placeholder="ชื่อร้านค้า (เช่น ร้านป้าน้อย)" style="flex:2; font-weight:bold;" />
+        </div>
+
+        <div style="font-size:14px; font-weight:bold; color:var(--text2); margin-bottom:10px;">เลือกของที่ไปส่ง (กดบวกเพิ่มจำนวนถุง):</div>
+        
+        <div id="consignProductSelection" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px;"></div>
+
+        <div class="summary-box" style="border: 2px dashed var(--consignment); background: #FFFdfa;">
+          <div style="font-weight:bold; font-size:15px; color:var(--consignment); border-bottom: 1px dashed #CE93D8; padding-bottom:8px; margin-bottom:8px;">📦 สรุปของไปส่งร้าน:</div>
+          
+          <div id="consignSummaryList" style="margin-bottom:15px; min-height: 40px;">
+            <div style="color:var(--text3); font-size:13px; text-align:center; padding-top:10px;">จิ้มปุ่มด้านบนเพื่อเพิ่มรายการ</div>
+          </div>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-top: 2px dashed var(--consignment); padding-top: 10px;">
+            <div style="font-weight:bold; font-size:16px;">รวมมูลค่าทั้งหมด:</div>
+            <div style="text-align:right;">
+                <div style="font-size:14px; color:var(--text2);"><span id="csnTotalQtyText">0</span> ถุง</div>
+                <input class="form-control" type="number" id="csnTotalValue" disabled placeholder="0" style="width:120px; font-size:22px; font-weight:bold; background:transparent; color:var(--consignment); text-align:right; border:none; padding:0;" />
+            </div>
+          </div>
+
+          <button class="btn btn-primary" style="width:100%; background: var(--consignment); font-size:15px; padding:15px; box-shadow: 0 4px 10px rgba(156, 39, 176, 0.3);" onclick="saveConsignOrder()">🚚 สร้างบิลฝากขาย (รอเก็บเงินตอนเย็น)</button>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-title" style="color: var(--consignment);">ประวัติฝากขายร้านค้า</div>
+        
+        <div class="order-tabs-container">
+          <button class="order-tab tab-csn active" onclick="setConsignFilter('all', this)" style="border-color:var(--consignment);">📂 ทั้งหมด</button>
+          <button class="order-tab tab-csn" onclick="setConsignFilter('today', this)" style="border-color:var(--consignment);">📅 วันนี้</button>
+          <button class="order-tab tab-csn" onclick="setConsignFilter('pending', this)" style="border-color:var(--consignment);">⏳ ยังไม่เคลียร์</button>
+          <button class="order-tab tab-csn" onclick="setConsignFilter('completed', this)" style="border-color:var(--consignment);">✅ เคลียร์แล้ว</button>
+          <button class="order-tab tab-csn" onclick="setConsignFilter('cancelled', this)" style="border-color:var(--consignment);">❌ ยกเลิก</button>
+        </div>
+
+        <input type="text" id="searchConsignInput" class="form-control" placeholder="🔍 ค้นหา: เลขออเดอร์, ชื่อร้านค้า, วันที่, รายการขนม..." style="margin-bottom: 15px; border-color: var(--consignment);" oninput="filterConsignOrders()" />
+        
+        <div id="consignList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-event">
+    <div class="grid-2">
+        <div class="card" style="background:#FFFAF0; border:2px solid #D4AF37;">
+            <div class="card-title" style="color:#B8860B;">🎁 รับออเดอร์จัดเลี้ยง</div>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <div style="flex:1;">
+                    <label style="font-size:13px; font-weight:bold; color:var(--text2);">วัน/เวลารับของ:</label>
+                    <input type="datetime-local" id="evDateTime" class="form-control" style="margin-top:5px; border-color:#D4AF37; font-family:'Prompt'; cursor:pointer;" onclick="try { this.showPicker(); } catch(e) {}">
+                </div>
+            </div>
+            <div style="margin-bottom:15px;">
+                <input type="text" id="evName" class="form-control" placeholder="ชื่อลูกค้า / ชื่องาน (เช่น คุณหญิง งานทำบุญ)" style="margin-bottom:10px; border-color:#D4AF37;">
+                <input type="tel" id="evPhone" class="form-control" placeholder="เบอร์โทรศัพท์ติดต่อ" style="border-color:#D4AF37;">
+            </div>
+            <div style="margin-bottom:15px;">
+                <label style="font-size:14px; font-weight:bold; color:#B8860B;">จิ้มเลือกเมนูจัดเลี้ยง:</label>
+                <div id="eventProductSelection" style="margin-top:10px; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;"></div>
+            </div>
+            <div class="summary-box" style="border: 2px dashed #D4AF37; background: #FFFdfa;">
+                <div style="font-weight:bold; font-size:15px; color:#B8860B; border-bottom: 1px dashed #FFE69C; padding-bottom:8px; margin-bottom:8px;">🛒 สรุปรายการ:</div>
+                <div id="eventSummaryList" style="margin-bottom:15px; min-height: 40px;">
+                    <div style="color:var(--text3); font-size:13px; text-align:center; padding-top:10px;">ยังไม่ได้เลือกรายการ</div>
+                </div>
+                <div style="display:flex; gap:10px; margin-bottom:15px; border-top: 2px dashed #D4AF37; padding-top: 10px;">
+                    <div style="flex:1;">
+                        <label style="font-size:13px; font-weight:bold; color:var(--text2);">ยอดรวม (บาท):</label>
+                        <input type="number" id="evTotal" class="form-control" style="margin-top:5px; font-size:18px; font-weight:bold; color:#B8860B; background:transparent; border:none; padding:0; text-align:right;" disabled placeholder="0">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:13px; font-weight:bold; color:var(--text2);">รับมัดจำมา (บาท):</label>
+                        <input type="number" id="evPaid" class="form-control" style="margin-top:5px; border-color:#D4AF37; text-align:right;" placeholder="ยังไม่จ่ายเว้นไว้">
+                    </div>
+                </div>
+                <button class="btn btn-primary" style="width:100%; background: #D4AF37; border-color: #D4AF37; font-size:15px; padding:15px; box-shadow: 0 4px 10px rgba(212, 175, 55, 0.3);" onclick="saveEventOrder()">🎁 บันทึกออเดอร์จัดเลี้ยง</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title" style="color:#B8860B;">ประวัติงานจัดเลี้ยง</div>
+            <div class="order-tabs-container">
+                <button class="order-tab active event-tab-all" onclick="setEventFilter('all', this)" style="border-color:#D4AF37; color:#B8860B;">🎁 ทั้งหมด</button>
+                <button class="order-tab event-tab-pending" onclick="setEventFilter('pending', this)" style="border-color:#D4AF37; color:#B8860B;">🟡 รอยืนยัน</button>
+                <button class="order-tab event-tab-cooking" onclick="setEventFilter('cooking', this)" style="border-color:#D4AF37; color:#B8860B;">🍳 กำลังทำ</button>
+                <button class="order-tab event-tab-completed" onclick="setEventFilter('completed', this)" style="border-color:#D4AF37; color:#B8860B;">✅ เสร็จแล้ว</button>
+                <button class="order-tab event-tab-cancelled" onclick="setEventFilter('cancelled', this)" style="border-color:#D4AF37; color:#B8860B;">❌ ยกเลิก</button>
+            </div>
+            <input type="text" id="searchEventInput" class="form-control" placeholder="🔍 ค้นหา: ชื่องาน, เบอร์โทร..." onkeyup="filterEventOrders()" style="margin-bottom:15px; border-color:#FFE69C; background:#FFF9E5;">
+            <div id="eventList"></div>
+        </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-products">
+    <div class="card">
+      <div class="card-title">➕ เพิ่มข้อมูลสินค้า / จัดเลี้ยง</div>
+      
+      <div style="margin-bottom: 15px; font-weight: bold; color: var(--text2); display: flex; gap: 15px; flex-wrap: wrap;">
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+          <input type="radio" name="newProdCategory" value="normal" checked class="checkbox-custom" style="width: 18px; height: 18px;"> 🏪 สินค้าหน้าร้าน
+        </label>
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+          <input type="radio" name="newProdCategory" value="event" class="checkbox-custom" style="width: 18px; height: 18px;"> 🎁 จัดเลี้ยง
+        </label>
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+          <input type="radio" name="newProdCategory" value="consignment" class="checkbox-custom" style="width: 18px; height: 18px;"> 📦 ฝากขาย
+        </label>
+      </div>
+
+      <div class="grid-3">
+        <input class="form-control" id="newProdEmoji" placeholder="อิโมจิ (เช่น 🍌)" />
+        <input class="form-control" id="newProdName" placeholder="ชื่อสินค้า หรือ แพ็กเกจ" />
+        <input class="form-control" type="number" id="newProdPrice" placeholder="ราคา (บาท)" />
+      </div>
+      <button class="btn btn-primary" style="margin-top:15px;" onclick="saveProduct()">เพิ่มสินค้าเข้าระบบ</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">เมนูสินค้าทั้งหมด</div>
+      
+      <div class="tab-row" style="margin-bottom: 20px;">
+        <button class="tab-btn active" id="tabProdNormal" onclick="setProductFilter('normal')">🏪 หน้าร้าน</button>
+        <button class="tab-btn" id="tabProdEvent" onclick="setProductFilter('event')">🎁 จัดเลี้ยง</button>
+        <button class="tab-btn" id="tabProdConsign" onclick="setProductFilter('consignment')">📦 ฝากขาย</button>
+      </div>
+
+      <div class="grid-3" id="productList"></div>
+    </div>
+  </div>
+  <div class="page" id="page-reports">
+  <div class="grid-2">
+    <div class="card" style="border: 2px solid #2E7D32;">
+      <div class="card-title" style="color: #2E7D32;">📊 ตั้งค่ารายงานที่ต้องการ</div>
+
+      <div style="margin-bottom: 15px;">
+        <label style="font-weight: bold; font-size: 14px;">1. เลือกประเภทรายงาน:</label>
+        <select id="rptCategory" class="form-control" style="margin-top: 5px; border-color: #2E7D32;">
+          <option value="all">📦 รวมทุกประเภทออเดอร์</option>
+          <option value="normal">🏪 เฉพาะขายหน้าร้าน</option>
+          <option value="online">📱 เฉพาะออเดอร์ออนไลน์</option>
+          <option value="event">🎁 เฉพาะงานจัดเลี้ยง</option>
+          <option value="consignment">🚚 เฉพาะฝากขายร้านค้า</option>
+          <option value="finance">💰 รายรับ-รายจ่าย (บัญชีร้าน)</option>
+        </select>
+      </div>
+
+      <div class="grid-2" style="margin-bottom: 20px;">
+        <div>
+          <label style="font-weight: bold; font-size: 14px;">2. ตั้งแต่วันที่:</label>
+          <input type="date" id="rptStart" class="form-control" style="margin-top: 5px;" onclick="try { this.showPicker(); } catch(e) {}">
+        </div>
+        <div>
+          <label style="font-weight: bold; font-size: 14px;">ถึงวันที่:</label>
+          <input type="date" id="rptEnd" class="form-control" style="margin-top: 5px;" onclick="try { this.showPicker(); } catch(e) {}">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="background: #2E7D32; width: 100%; padding: 15px; font-size: 16px;" onclick="generateReportPreview()">🔍 ตรวจสอบข้อมูลเบื้องต้น</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">✨ สรุปภาพรวมในช่วงที่เลือก</div>
+      <div id="rptInsight" style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="text-align: center; color: var(--text3); padding: 30px;">เลือกเงื่อนไขแล้วกด "ตรวจสอบข้อมูล"</div>
+      </div>
+      <div id="rptAction" style="display: none; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 20px;">
+        <button class="btn" style="background: #1D6F42; color: white; width: 100%; border: none; padding: 12px; font-weight: bold;" onclick="exportToExcel()">📥 ดาวน์โหลดไฟล์ Excel (.xlsx)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="rptPreviewContainer" style="display: none; overflow-x: auto;">
+    <div class="card-title">📋 ตัวอย่างข้อมูลที่จะส่งออก</div>
+    <table id="rptTable" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="background: #f5f5f5; text-align: left;">
+          <th style="padding: 10px; border: 1px solid #ddd;">วันที่</th>
+          <th style="padding: 10px; border: 1px solid #ddd;">รายละเอียด</th>
+          <th style="padding: 10px; border: 1px solid #ddd;">ยอดรวม</th>
+          <th style="padding: 10px; border: 1px solid #ddd;">สถานะ</th>
+        </tr>
+      </thead>
+      <tbody id="rptTableBody"></tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="imageModal" onclick="closeModal('imageModal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <img id="modalImg" class="preview-img" />
+    <button class="btn btn-primary" style="margin-top:15px" onclick="closeModal('imageModal')">ปิดหน้าต่าง</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editOrderInfoModal">
+  <div class="modal" style="max-width: 500px; padding: 25px;">
+    <div style="font-family:'Prompt'; font-size:18px; font-weight:bold; color:var(--primary); margin-bottom:15px;">✏️ แก้ไขข้อมูลบิล</div>
+    
+    <div class="grid-2" style="margin-bottom:10px;">
+        <div>
+            <div style="margin-bottom:5px; font-size:13px; color:var(--text2); font-weight:bold;">วันที่:</div>
+            <input class="form-control" type="date" id="editOrderDate" style="margin-bottom:10px; padding:8px; font-size:14px;" />
+        </div>
+        <div>
+            <div style="margin-bottom:5px; font-size:13px; color:var(--text2); font-weight:bold;">ชื่อลูกค้า / ร้านค้า:</div>
+            <input class="form-control" id="editOrderName" placeholder="ระบุชื่อ" style="margin-bottom:10px; padding:8px; font-size:14px;" />
+        </div>
+        <div>
+            <div style="font-size:13px; font-weight:bold; color:var(--text2); margin-top:10px; margin-bottom:5px;">เบอร์โทรศัพท์:</div>
+            <input type="tel" id="editOrderPhone" class="form-control" placeholder="ไม่มีเบอร์โทร" />
+        </div>
+    </div>
+    
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+        <div style="font-size:13px; color:var(--text2); font-weight:bold;">รายการสั่งซื้อ:</div>
+        <div id="editOrderTotal" style="font-size:14px; color:var(--primary); font-weight:bold;">รวมยอดใหม่: ฿0</div>
+    </div>
+    
+    <div id="editOrderItemsContainer" style="background:#FAFAFA; padding:10px; border-radius:8px; border:1px solid #eee; margin-bottom:10px; max-height:200px; overflow-y:auto;">
+    </div>
+    
+    <button class="btn-outline" style="width:100%; margin-bottom:20px; padding:8px; font-size:13px; font-weight:bold; border-style:dashed;" onclick="addEditItem()">➕ เพิ่มรายการขนมใหม่</button>
+    
+    <div class="grid-2">
+      <button class="btn btn-outline" onclick="closeModal('editOrderInfoModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="submitEditOrderInfo()">💾 บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div style="font-family:'Prompt'; font-size:18px; font-weight:bold; color:var(--primary); margin-bottom:15px;">✏️ แก้ไขเมนูสินค้า</div>
+    
+    <div style="margin-bottom:5px; font-size:13px; color:var(--text2); font-weight:bold;">ประเภท:</div>
+    <select id="editProdCategory" class="form-control" style="margin-bottom:10px; font-family:'Prompt';">
+      <option value="normal">🏪 สินค้าหน้าร้าน</option>
+      <option value="event">🎁 เมนูจัดเลี้ยง</option>
+      <option value="consignment">📦 เมนูฝากขาย</option>
+    </select>
+
+    <div style="margin-bottom:5px; font-size:13px; color:var(--text2); font-weight:bold;">อิโมจิ:</div>
+    <input class="form-control" id="editProdEmoji" placeholder="อิโมจิ" style="margin-bottom:10px;" />
+    <div style="margin-bottom:5px; font-size:13px; color:var(--text2); font-weight:bold;">ชื่อสินค้า:</div>
+    <input class="form-control" id="editProdName" placeholder="ชื่อสินค้า" style="margin-bottom:10px;" />
+    <div style="margin-bottom:5px; font-size:13px; color:var(--text2); font-weight:bold;">ราคา (บาท):</div>
+    <input class="form-control" type="number" id="editProdPrice" placeholder="ราคา (บาท)" style="margin-bottom:20px;" />
+    <div class="grid-2">
+      <button class="btn btn-outline" onclick="closeModal('editModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="submitEditProduct()">บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal" style="text-align:center;">
+    <div style="font-size:50px; margin-bottom:10px;">🗑️</div>
+    <div style="font-family:'Prompt'; font-size:20px; font-weight:bold; color:var(--danger); margin-bottom:10px;">ยืนยันการลบ?</div>
+    <p style="color:var(--text2); margin-bottom:25px; font-size:14px;">รายการนี้จะถูกย้ายไปที่ "ถังขยะ"</p>
+    <div class="grid-2">
+      <button class="btn btn-outline" onclick="closeModal('deleteModal')">ยกเลิก</button>
+      <button class="btn btn-danger" onclick="submitDelete()">ย้ายลงถังขยะ</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cancelOrderModal">
+  <div class="modal" style="text-align:center;">
+    <div style="font-size:50px; margin-bottom:10px;">❌</div>
+    <div style="font-family:'Prompt'; font-size:20px; font-weight:bold; color:var(--danger); margin-bottom:10px;">ยืนยันการยกเลิกบิล?</div>
+    <p style="color:var(--text2); margin-bottom:25px; font-size:14px;">สถานะบิลจะถูกเปลี่ยนเป็น "ยกเลิก"</p>
+    <div class="grid-2">
+      <button class="btn btn-outline" onclick="closeModal('cancelOrderModal')">ปิดหน้าต่าง</button>
+      <button class="btn btn-danger" onclick="submitRejectOrder()">ยืนยันยกเลิก</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="trashModal">
+  <div class="modal" style="max-width:600px;">
+    <div style="font-family:'Prompt'; font-size:18px; font-weight:bold; color:var(--primary); margin-bottom:15px;">🗑️ ถังขยะ (กู้คืนข้อมูล)</div>
+    
+    <div style="font-weight:bold; color:var(--text2); margin-top:10px;">🛒 ออเดอร์ที่ถูกลบ</div>
+    <div id="trashOrders" style="margin-bottom:15px;"></div>
+
+    <div style="font-weight:bold; color:var(--text2);">💰 การเงินที่ถูกลบ</div>
+    <div id="trashFinance" style="margin-bottom:15px;"></div>
+
+    <div style="font-weight:bold; color:var(--text2);">🧺 สินค้าที่ถูกลบ</div>
+    <div id="trashProducts" style="margin-bottom:15px;"></div>
+
+    <button class="btn btn-outline" style="margin-top:15px" onclick="closeModal('trashModal')">ปิดหน้าต่าง</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="consignClearModal">
+  <div class="modal">
+    <div style="font-family:'Prompt'; font-size:18px; font-weight:bold; color:var(--consignment); margin-bottom:15px;">📦 เคลียร์บิลฝากขาย</div>
+    
+    <div style="margin-bottom: 15px; font-size: 14px; background: #FAFAFA; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+      <div><b>ร้าน:</b> <span id="consignShopName" style="color: var(--primary);"></span></div>
+      <div><b>ยอดที่ไปส่งตอนเช้า:</b> ฿<span id="consignOriginalTotal"></span></div>
+    </div>
+
+    <div style="margin-bottom:5px; font-size:13px; color:var(--text2); font-weight:bold;">ระบุของเหลือคืน (คิดเป็นเงินบาทอัตโนมัติ):</div>
+    <div id="consignReturnItemsContainer" style="margin-bottom: 15px; max-height: 200px; overflow-y: auto;">
+    </div>
+
+    <div style="background:#F3E5F5; border:1.5px dashed var(--consignment); padding:15px; border-radius:12px; text-align:center; margin-bottom: 20px;">
+      <div style="font-size:14px; font-weight:bold; color:var(--consignment);">ยอดเงินที่ต้องเก็บจริง:</div>
+      <div id="consignFinalTotal" style="font-size:32px; font-weight:bold; font-family:'Prompt'; color:var(--consignment);">฿0</div>
+    </div>
+
+    <div class="grid-2">
+      <button class="btn btn-outline" onclick="closeModal('consignClearModal')">ยกเลิก</button>
+      <button class="btn btn-primary" style="background: var(--success);" onclick="submitConsignClear()">✅ รับเงิน & ปิดบิล</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="receiptModal">
+  <div class="modal" style="background: #f9f9f9; padding: 0;">
+    <div id="receiptContent" class="receipt-container">
+      <div class="receipt-header">
+        <div class="receipt-logo">🍌</div>
+        <div class="receipt-title">ร้านกล้วยทอดคุณแม่</div>
+        <div class="receipt-info" id="receiptDate"></div>
+        <div class="receipt-info" id="receiptId"></div>
+      </div>
+      
+      <div style="margin-bottom: 10px; font-weight: bold; font-size: 14px;" id="receiptCustomer"></div>
+      
+      <div id="receiptItemsContainer" style="min-height: 50px; margin-bottom: 15px;"></div>
+      
+      <div class="receipt-total">
+        <span>ยอดรวมทั้งสิ้น</span>
+        <span id="receiptTotalAmount"></span>
+      </div>
+      
+      <div style="text-align: right; font-size: 13px; margin-top: 5px; color: #555;" id="receiptPaidAmount"></div>
+
+      <div class="receipt-footer">
+        ขอบคุณที่อุดหนุนครับ/ค่ะ 🙏<br>
+        <span style="font-size: 10px; color: #999;">พิมพ์เมื่อ: <span id="receiptPrintTime"></span></span>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 15px; padding: 20px;">
+      <button class="btn btn-outline" onclick="closeModal('receiptModal')">ปิดหน้าต่าง</button>
+      <button class="btn btn-primary" onclick="downloadReceipt()">📥 โหลดรูปบิล</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/script.js"></script>
+
+</body>
+</html>

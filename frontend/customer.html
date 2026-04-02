@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>สั่งซื้อกล้วยทอดคุณแม่</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="customer-style.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+
+<div id="closedOverlay">
+  <div style="font-size: 80px; margin-bottom: 20px;">🛑</div>
+  <h2 style="color: var(--danger); font-family: 'Prompt'; margin-bottom: 10px;">ขออภัย ร้านปิดรับออเดอร์ชั่วคราว</h2>
+  <p style="color: var(--text2); font-size: 16px;">แม่ค้ากำลังเคลียร์คิว หรือของหมดแล้วจ้า<br>รบกวนแวะมาใหม่โอกาสหน้านะคะ 🙏</p>
+  <button style="margin-top: 30px; padding: 12px 24px; border-radius: 10px; background: var(--primary); color: white; border: none; font-family: 'Prompt'; font-size: 16px; cursor: pointer;" onclick="location.reload()">🔄 ลองโหลดหน้าเว็บใหม่</button>
+</div>
+
+<div id="toastContainer"></div>
+
+<div id="mainOrderScreen">
+  <div class="header">
+    <div class="logo">🍌 สั่งกล้วยทอดคุณแม่</div>
+    <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">สั่งออนไลน์ สะดวก รวดเร็ว ไม่ต้องรอคิว</div>
+  </div>
+
+  <div class="container">
+    <div class="event-banner" onclick="toggleScreen('eventOrderScreen')">
+      <div>
+        <div style="font-family:'Prompt'; font-size: 18px; font-weight: bold;">🎁 รับจัดเบรก / จัดชุดงานเลี้ยง</div>
+        <div style="font-size: 13px; opacity: 0.9;">งานบุญ งานบวช งานประชุม คลิกเลย!</div>
+      </div>
+      <div style="font-size: 24px;">👉</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">👤 ข้อมูลผู้สั่งซื้อ</div>
+      <input type="text" id="custName" class="form-control" placeholder="ระบุชื่อของคุณ (เพื่อรับของ)" style="margin-bottom: 10px;" />
+      <input type="tel" id="custPhone" class="form-control" placeholder="เบอร์โทรศัพท์ (ไม่บังคับ)" />
+      <div style="font-size: 12px; color: var(--text3); margin-top: 8px; line-height: 1.4;">
+        *ระบุเบอร์โทรเผื่อสินค้าหมด (หากไม่ระบุ รบกวนคุณลูกค้าติดต่อที่หน้าร้านนะครับ)
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🧺 เลือกเมนูความอร่อย</div>
+      <div id="menuList">
+        <div style="text-align:center; padding:20px; color:var(--text3);">กำลังโหลดเมนู...</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 120px;">
+      <div class="card-title">💸 วิธีการชำระเงิน</div>
+      
+      <label class="pay-option" onclick="selectPayment('transfer', 'normal')">
+        <input type="radio" name="payment" value="transfer" checked> 🏦 โอนเงินผ่านพร้อมเพย์ (สแกน QR)
+      </label>
+      
+      <label class="pay-option" onclick="selectPayment('wallet', 'normal')">
+        <input type="radio" name="payment" value="wallet"> 📱 TrueMoney Wallet
+      </label>
+      
+      <label class="pay-option" onclick="selectPayment('cod', 'normal')">
+        <input type="radio" name="payment" value="cod"> 💵 เก็บเงินปลายทาง (จ่ายหน้าร้าน)
+      </label>
+
+      <div id="payDetails" class="pay-details" style="display: block;">
+        <div id="bankInfo">
+          <b>🏦 พร้อมเพย์ (PromptPay)</b><br>
+          <b>ชื่อบัญชี:</b> นาย วงศกร ขุนไชยการ<br>
+          <b>เลขที่บัญชี:</b> 076-255-6758<br>
+          <div class="qr-container">
+            <img id="qrImage" class="qr-image" src="" />
+            <div id="qrTextContainer" style="display: none; margin-top: 15px;">
+              <div style="font-size: 15px; color: var(--success); font-weight: bold; margin-bottom: 10px;" id="qrTextAmount"></div>
+              <button type="button" class="btn-outline" style="padding: 10px 20px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="downloadQR('qrImage')">
+                <span style="font-size: 18px;">💾</span> บันทึกรูปลงเครื่อง
+              </button>
+            </div>
+            <div id="qrTextPlaceholder" style="font-size: 14px; color: var(--danger); margin-top: 10px; font-weight: bold;">
+              * เลือกเมนูเพื่อสร้าง QR Code สำหรับสแกนจ่าย
+            </div>
+          </div>
+        </div>
+        
+        <div id="walletInfo" style="display: none;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+            <b>📱 TrueMoney:</b> <span style="font-size: 16px; font-weight: bold; color: var(--primary);">0968585135</span>
+            <button type="button" class="btn-outline" style="padding: 4px 12px; font-size: 12px;" onclick="copyWalletNumber()">📋 คัดลอกเบอร์</button>
+          </div>
+          <b>ชื่อบัญชี:</b> นาย วงศกร ขุนไชยการ<br>
+          <span style="font-size: 12px; color: var(--danger);">* กรุณาโอนเงินให้ตรงกับยอดรวมด้านล่าง</span>
+        </div>
+
+        <div style="margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 15px;">
+          <b style="font-size: 15px;">📎 แนบสลิปโอนเงิน (เพื่อยืนยันออเดอร์):</b>
+          <input type="file" id="slipInput" accept="image/*" style="display: none;" onchange="previewSlip(event, 'normal')" />
+          <label for="slipInput" class="upload-zone" id="uploadZone">
+            <div id="uploadPlaceholder">
+              <div class="upload-icon">📸</div><div class="upload-text">แตะเพื่อเลือกรูปสลิปโอนเงิน</div>
+            </div>
+            <img id="slipPreview" style="display:none; width:100%; border-radius:8px; object-fit: contain; max-height: 350px;" />
+          </label>
+          <div id="slipAiStatus" style="font-size: 14px; margin-top: 10px; font-weight: bold; text-align: center;"></div>
+          <button type="button" id="btnChangeSlip" class="btn-outline" style="display:none; width: 100%; margin-top: 10px; padding: 10px; justify-content: center; align-items: center; gap: 5px;" onclick="document.getElementById('slipInput').click()">🔄 เปลี่ยนรูปสลิป</button>
+        </div>
+      </div>
+      
+      <div id="codDetails" class="pay-details" style="display: none; background: #FFF0F0; border-color: var(--danger); color: var(--danger);">
+        <b>⚠️ คำแนะนำ:</b><br>กรุณาเตรียมเงินสดให้พอดีกับยอดรวม และชำระกับแม่ค้าตอนรับสินค้านะคะ
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-submit" id="mainSubmitBtn" onclick="submitOrder('normal')">
+    <div>ยอดรวม: <span id="totalAmountDisplay">฿0</span></div>
+    <div>ยืนยันคำสั่งซื้อ 🚀</div>
+  </button>
+</div>
+
+<div id="eventOrderScreen" style="display: none;">
+  <div class="header" style="background: linear-gradient(135deg, #D4AF37, #B8860B);">
+    <div style="font-size: 30px; position:absolute; left:20px; top:20px; cursor:pointer;" onclick="toggleScreen('mainOrderScreen')">🔙</div>
+    <div class="logo">🎁 สั่งจัดชุดงานเลี้ยง</div>
+    <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">งานบวช งานบุญ ประชุม สัมมนา</div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">👤 ข้อมูลผู้ติดต่อ (สำคัญ)</div>
+      <input type="text" id="evName" class="form-control" placeholder="ชื่อ-นามสกุล ผู้สั่ง" style="margin-bottom: 10px;" />
+      <input type="tel" id="evPhone" class="form-control" placeholder="เบอร์โทรศัพท์ (ต้องระบุ)" />
+    </div>
+
+    <div class="card">
+      <div class="card-title">📅 รายละเอียดงาน</div>
+      <div style="margin-bottom:10px; font-weight:bold; font-size:14px; color:var(--text2);">ประเภทงาน:</div>
+      <select id="evType" class="form-control" style="margin-bottom: 15px; font-family:'Prompt';">
+        <option value="งานทำบุญ/งานบวช">🙏 งานทำบุญ / งานบวช</option>
+        <option value="งานแต่งงาน">💍 งานแต่งงาน</option>
+        <option value="ประชุม/สัมมนา">💼 ประชุม / สัมมนา / งานอีเวนต์</option>
+        <option value="งานศพ/สวดอภิธรรม">🖤 งานศพ / สวดอภิธรรม</option>
+        <option value="อื่นๆ">🎉 งานเลี้ยงอื่นๆ</option>
+      </select>
+
+      <div style="margin-bottom:10px; font-weight:bold; font-size:14px; color:var(--text2);">วันและเวลารับของ:</div>
+      <input type="datetime-local" id="eventDateTime" class="form-control" style="cursor:pointer;" onclick="try { this.showPicker(); } catch(e) {}">
+    </div>
+
+    <div class="card">
+      <div class="card-title">🍱 เลือกรูปแบบขนมและงบประมาณ</div>
+      
+      <div class="mode-selector">
+        <label class="mode-btn active" id="modeBtnCustom" onclick="setEventMode('custom')">
+          <input type="radio" name="eventMode" value="custom" checked> ✍️ เลือกขนมระบุงบเอง
+        </label>
+        <label class="mode-btn" id="modeBtnMixed" onclick="setEventMode('mixed')">
+          <input type="radio" name="eventMode" value="mixed"> 🎲 ให้ร้านคละให้
+        </label>
+      </div>
+
+      <div id="eventCustomContainer">
+        <div style="font-size:13px; color:var(--text3); margin-bottom:10px;">* ติ๊กเลือกรายการที่ต้องการ และระบุจำนวนเงิน (บาท)</div>
+        <div id="eventMenuList">
+          <div style="text-align:center; padding:20px; color:var(--text3);">กำลังโหลดเมนูจัดเลี้ยง...</div>
+        </div>
+      </div>
+
+      <div id="eventMixedContainer" style="display: none; background: var(--surface2); padding: 15px; border-radius: 10px; border: 1.5px solid var(--border);">
+        <div style="font-weight: bold; margin-bottom: 5px; color: var(--text2);">💰 งบประมาณรวมที่ต้องการ (บาท):</div>
+        <input type="number" id="evMixedBudget" class="form-control" placeholder="เช่น 500, 1000" oninput="calcEventTotal()" style="font-size: 18px; font-weight: bold; color: var(--primary);">
+        <div style="font-size: 13px; color: var(--text3); margin-top: 5px;">* ทางร้านจะจัดคละขนมที่พร้อมที่สุดให้พอดีกับงบประมาณครับ</div>
+      </div>
+
+      <div style="background:#FFF0F0; border:2px dashed var(--danger); padding:15px; border-radius:12px; text-align:center; margin-top: 20px;">
+        <div style="font-size:14px; font-weight:bold; color:var(--danger);">ยอดรวมจัดเลี้ยงทั้งหมด:</div>
+        <div id="evTotalDisplay" style="font-size:32px; font-weight:bold; font-family:'Prompt'; color:var(--danger);">฿0</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 120px;">
+      <div class="card-title">💸 โอนมัดจำ / จ่ายเต็มจำนวน</div>
+      
+      <div style="background:#f8f9fa; padding:15px; border-radius:12px; border:1px solid #ddd;">
+        <b>🏦 พร้อมเพย์:</b> นาย วงศกร ขุนไชยการ<br>
+        <b>เลขที่:</b> 076-255-6758<br>
+        
+        <div class="qr-container" style="border-color: #D4AF37;">
+          <img id="evQrImage" class="qr-image" src="" style="display:block; margin: 10px auto;" />
+          <div style="font-size: 15px; color: var(--success); font-weight: bold; margin-top: 10px;" id="evQrTextAmount">📲 ระบุยอดเงินเพื่อสร้าง QR</div>
+          <button type="button" class="btn-outline" style="padding: 8px; width: 100%; margin-top:10px; border-color: #D4AF37; color: #B8860B;" onclick="downloadQR('evQrImage')">💾 บันทึก QR Code</button>
+        </div>
+
+        <div style="margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 15px;">
+          <b style="font-size: 15px;">📎 แนบสลิปมัดจำ/จ่ายเต็ม:</b>
+          <input type="file" id="evSlipInput" accept="image/*" style="display: none;" onchange="previewSlip(event, 'event')" />
+          <label for="evSlipInput" class="upload-zone" id="evUploadZone">
+            <div id="evUploadPlaceholder"><div class="upload-icon">📸</div><div class="upload-text" style="color: #D4AF37;">แนบรูปสลิปที่นี่</div></div>
+            <img id="evSlipPreview" style="display:none; width:100%; border-radius:8px; object-fit: contain; max-height: 250px;" />
+          </label>
+          <div id="evSlipAiStatus" style="font-size: 14px; margin-top: 10px; font-weight: bold; text-align: center;"></div>
+          <button type="button" id="btnChangeEvSlip" class="btn-outline" style="display:none; width: 100%; margin-top: 10px; padding: 8px; border-color: #D4AF37; color: #B8860B;" onclick="document.getElementById('evSlipInput').click()">🔄 เปลี่ยนรูปสลิป</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-submit" id="evSubmitBtn" onclick="submitOrder('event')" style="background: linear-gradient(135deg, #D4AF37, #B8860B);">
+    <div>ยอดรวม: <span id="evBtnTotal">฿0</span></div>
+    <div>ส่งออเดอร์จัดเลี้ยง 🚀</div>
+  </button>
+</div>
+
+<div id="trackingScreen">
+  <div id="trackMainIcon" style="font-size: 100px; margin-bottom: 20px; animation: pulse 2s infinite;">⏳</div>
+  <h2 id="trackTitle" style="font-family:'Prompt'; color:var(--primary); font-size: 26px; margin-bottom: 10px;">รอร้านตรวจสอบบิล...</h2>
+  <p id="trackDesc" style="color:var(--text2); font-size: 15px; margin-bottom: 40px; padding: 0 20px;">กรุณารอสักครู่ คุณแม่กำลังตรวจสอบยอดเงินและเตรียมคิวให้ครับ (หน้านี้จะอัปเดตอัตโนมัติ)</p>
+
+  <div style="display: flex; justify-content: space-between; max-width: 300px; margin: 0 auto; position: relative;">
+    <div style="position: absolute; top: 25px; left: 10%; right: 10%; height: 4px; background: #eee; z-index: -1;"></div>
+    <div class="status-step active" id="step-pending"><div class="step-icon">📝</div><div style="font-size: 12px;">สั่งแล้ว</div></div>
+    <div class="status-step" id="step-cooking"><div class="step-icon">🍳</div><div style="font-size: 12px;">กำลังทำ</div></div>
+    <div class="status-step" id="step-completed"><div class="step-icon">🛍️</div><div style="font-size: 12px;">เสร็จแล้ว</div></div>
+  </div>
+
+  <button id="btnNewOrder" onclick="clearSessionAndReload()" style="display:none; margin: 50px auto 0; background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: pointer; width: 80%;">สั่งออเดอร์ใหม่</button>
+</div>
+
+<script src="js/customer-script.js"></script>
+
+</body>
+</html>
