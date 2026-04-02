@@ -1,6 +1,6 @@
 let finType = 'expense'; let tempFinBase64 = null; let tempOrdBase64 = null; let currentUser = null; 
 // 🌟 แก้ไข API_URL ให้ชี้ไปที่ Render (อย่าลืมเปลี่ยน banana-backend เป็นชื่อโปรเจกต์ที่คุณวงศกรตั้งใน Render นะครับ)
-const API_URL = 'https://banana-backend.onrender.com/api'; 
+const API_URL = 'https://banana-backend-fbt6.onrender.com/api';
 let currentOrdFile = null; let currentFinFile = null; // 🌟 เพิ่มตัวแปรสำหรับเก็บไฟล์รูปจริง (Multer)
 let currentEditId = null; let currentDeleteId = null; let currentDeleteTable = null; let allOrdersData = []; let currentOrderFilter = 'all'; let currentCancelOrderId = null; let currentOrderTypeFilter = 'all'; let allProductsData = []; let currentProdFilter = 'normal'; let isProductsRendered = false; let mySalesChart = null; let quickOrderItems = {}; let consignItems = {}; let consignReturnItems = {}; let previousPendingCount = 0; let isFirstLoad = true; let isStoreOpen = true; let combinedFinanceData = []; let currentFinanceFilter = 'all'; let currentConsignFilter = 'all'; let currentConsignOrderId = null; let currentEditOrderId = null; 
 let currentOrderPage = 1; let savedOrdersToRender = []; const ORDERS_PER_PAGE = 5; let currentConsignPage = 1; let savedConsignToRender = [];
